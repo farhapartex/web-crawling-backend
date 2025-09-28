@@ -1,10 +1,7 @@
 from pymongo import MongoClient
 from pymongo.database import Database
 from pymongo.collection import Collection
-import os
-from dotenv import load_dotenv
-
-load_dotenv()
+from config.settings import settings
 
 class DatabaseConnection:
     _instance = None
@@ -18,11 +15,8 @@ class DatabaseConnection:
 
     def connect(self) -> Database:
         if self._client is None:
-            mongodb_url = os.getenv("MONGODB_URL", "mongodb://localhost:27017")
-            db_name = os.getenv("MONGODB_DB_NAME", "book_scraping")
-
-            self._client = MongoClient(mongodb_url)
-            self._database = self._client[db_name]
+            self._client = MongoClient(settings.MONGODB_URL)
+            self._database = self._client[settings.MONGODB_DB_NAME]
         return self._database
 
     def get_collection(self, collection_name: str) -> Collection:
