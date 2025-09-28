@@ -5,12 +5,14 @@ import json
 import uuid
 from datetime import datetime
 from config.settings import settings
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
 class ScrapingTriggerRequest(BaseModel):
-    url: str = None
-    priority: int = 1
+    pass
 
 class ScrapingTriggerResponse(BaseModel):
     success: bool
@@ -18,22 +20,24 @@ class ScrapingTriggerResponse(BaseModel):
     event_id: str
 
 def get_rabbitmq_connection():
-    connection = pika.BlockingConnection(pika.URLParameters(settings.RABBITMQ_URL))
-    return connection
+    try:
+        logger.info(f"Connecting to RabbitMQ: {settings.RABBITMQ_URL}")
+        connection = pika.BlockingConnection(pika.URLParameters(settings.RABBITMQ_URL))
+        return connection
+    except Exception as e:
+        logger.error(f"Failed to connect to RabbitMQ: {e}")
+        raise
 
 @router.post("/trigger-scraping", response_model=ScrapingTriggerResponse)
-async def trigger_scraping(request: ScrapingTriggerRequest):
+async def trigger_scraping():
     try:
         event_id = str(uuid.uuid4())
+        logger.info(f"Generated event ID: {event_id}")
 
         event_data = {
             "event_id": event_id,
             "event_type": "start_scraping",
-            "timestamp": datetime.utcnow().isoformat(),
-            "payload": {
-                "url": request.url,
-                "priority": request.priority
-            }
+            "timestamp": datetime.utcnow().isoformat()
         }
 
         connection = get_rabbitmq_connection()
@@ -41,6 +45,7 @@ async def trigger_scraping(request: ScrapingTriggerRequest):
 
         channel.queue_declare(queue='scraping_events', durable=True)
 
+        logger.info(f"Publishing event to queue: {event_data}")
         channel.basic_publish(
             exchange='',
             routing_key='scraping_events',
@@ -52,6 +57,7 @@ async def trigger_scraping(request: ScrapingTriggerRequest):
         )
 
         connection.close()
+        logger.info(f"Successfully published event {event_id} and closed connection")
 
         return ScrapingTriggerResponse(
             success=True,
@@ -60,6 +66,7 @@ async def trigger_scraping(request: ScrapingTriggerRequest):
         )
 
     except Exception as e:
+        logger.error(f"Error in trigger_scraping: {str(e)}", exc_info=True)
         raise HTTPException(
             status_code=500,
             detail=f"Failed to trigger scraping event: {str(e)}"

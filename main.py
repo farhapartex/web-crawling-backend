@@ -2,6 +2,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routes import health, books, scraping
 from config.settings import settings
+from utils.logger import setup_logging
+import logging
+
+logger = setup_logging()
+logger.info("Starting Backend API")
 
 app = FastAPI(
     title=settings.API_TITLE,
